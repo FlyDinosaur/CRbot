@@ -137,12 +137,32 @@ assets/templates/btn_mode_1v1.png    模式菜单「经典1对1」 每次全屏�
 
 | 文件 | 内容 |
 |---|---|
-| `crbot.log` | 控制台的完整副本（UTF-8 BOM，逐块刷新，崩了也不丢） |
+| `crbot.log` | 完整日志（UTF-8 BOM，逐块刷新，崩了也不丢） |
 | `crbot_debug.png` | `finish_match` 卡住时存的现场帧 |
 | `crbot_battle_<serial>.png` | 等对局开始超时时存的现场帧 |
 
+**Debug / Release 的区别**：
+
+* **Debug**：弹控制台窗口 + 写 `crbot.log`，方便边跑边看；
+* **Release**：**不弹控制台**（`NDEBUG` 下跳过 `AllocConsole`），日志只落 `crbot.log`。
+  如果连文件也不要，把 `main.cpp` 里的 `start_log_tee("crbot.log")` 那行去掉即可。
+
 截图走 **PNG**（约 80KB）而不是原始帧（3.7MB）：多开时瓶颈是 adb 通道，PNG 快好几倍；
 解码失败会自动退回原始帧并打日志。单帧超过 2 秒会打 `slow screenshot` 警告。
+
+## 卡住时怎么办
+
+GUI 每台设备一行，右侧四个按钮：
+
+| 按钮 | 作用 |
+|---|---|
+| `Wait` | 登录超时等人工确认时出现，继续等 |
+| `Disconnect` | 同上，断开这台设备 |
+| `Stop` | **立即打断**：停线程 + 杀掉正在执行的 adb 命令，不等 60 秒超时 |
+| `Retry` | 从“连设备”那一步**整台重跑**（复用启动流程） |
+
+按钮只登记请求，真正的 stop/join/start 由主进程里的监视线程执行——
+界面线程从不阻塞，所以机器人卡在 adb 调用里时窗口也不会假死。
 
 
 

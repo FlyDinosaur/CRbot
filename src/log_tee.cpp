@@ -32,7 +32,12 @@ DWORD WINAPI pump(LPVOID) {
 }  // namespace
 
 bool start_log_tee(const char* path) {
+    // Release 版没有 AllocConsole，这里拿到的可能是空句柄：
+    // 那就只写文件，pump 里会跳过控制台写入。
     g_console = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (g_console == nullptr || g_console == INVALID_HANDLE_VALUE) {
+        g_console = INVALID_HANDLE_VALUE;
+    }
 
     g_file = CreateFileA(path, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS,
                          FILE_ATTRIBUTE_NORMAL, nullptr);

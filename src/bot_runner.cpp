@@ -64,7 +64,13 @@ void BotRunner::restart() {
 
     state_.set_status("Restarting...");
     stop();
-    join();  // 等旧线程真的退出（它每秒都会检查 stop_）
+
+    // 先打断正在跑的 adb 命令，否则 join() 可能卡到 60 秒超时
+    {
+        std::lock_guard<std::mutex> lk(adb_mtx_);
+        if (adb_) adb_->cancel();
+    }
+    join();  // 现在最多等它跑完当前这一步（通常 <1 秒）
 
     stop_ = false;
     {

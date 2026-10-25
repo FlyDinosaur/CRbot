@@ -1,6 +1,5 @@
 #include "gui_dashboard.h"
 #include <commctrl.h>
-#include <utility>
 
 #ifndef CRBOT_VERSION_W
 #define CRBOT_VERSION_W L"dev"
@@ -14,13 +13,12 @@ static constexpr int BTN_DISC_BASE  = 2000;
 static constexpr int BTN_RETRY_BASE = 3000;
 static constexpr int BTN_STOP_BASE  = 4000;
 
-GuiDashboard::GuiDashboard(HINSTANCE hInstance, std::vector<DeviceState*>& states,
-                           std::function<void(size_t)> on_retry,
-                           std::function<void(size_t)> on_abort)
-    : hInstance_(hInstance),
-      states_(states),
-      on_retry_(std::move(on_retry)),
-      on_abort_(std::move(on_abort)) {
+// 请求类型，和 DeviceState::request 对应
+static constexpr int REQ_RESTART = 1;
+static constexpr int REQ_ABORT = 2;
+
+GuiDashboard::GuiDashboard(HINSTANCE hInstance, std::vector<DeviceState*>& states)
+    : hInstance_(hInstance), states_(states) {
 
     WNDCLASSEX wc = {};
     wc.cbSize        = sizeof(WNDCLASSEX);
@@ -144,15 +142,16 @@ void GuiDashboard::on_disconnect(int idx) {
     states_[idx]->cv.notify_all();
 }
 
-void GuiDashboard::on_retry(int idx) {
-    if (!on_retry_) return;
-    on_retry_(static_cast<size_t>(idx));
+// 只登记请求，真正的 stop/join/start 由 main 的监视线程做——
+// 界面线程绝对不能阻塞在 join() 上。
+void GuiDashboard::post_request(int idx, int request) {
+    std::lock_guard<std::mutex> lock(states_[idx]->mtx);
+    states_[idx]->request = request;
 }
 
-void GuiDashboard::on_abort(int idx) {
-    if (!on_abort_) return;
-    on_abort_(static_cast<size_t>(idx));
-}
+void GuiDashboard::on_retry(int idx) { post_request(idx, REQ_RESTART); }
+
+void GuiDashboard::on_abort(int idx) { post_request(idx, REQ_ABORT); }
 
 LRESULT CALLBACK GuiDashboard::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     GuiDashboard* self = nullptr;

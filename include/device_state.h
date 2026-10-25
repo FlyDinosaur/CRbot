@@ -15,6 +15,10 @@ struct DeviceState {
     bool running = false;
     bool error = false;
 
+    // GUI 只写这个"请求"，由 main 里的监视线程去执行——
+    // 不能在界面线程里做 join()，否则机器人线程卡在 adb 调用时界面就假死了。
+    int request = 0;         // 0=none, 1=restart, 2=abort
+
     std::mutex mtx;
     std::condition_variable cv;
 

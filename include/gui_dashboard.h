@@ -1,15 +1,11 @@
 #pragma once
 #include "device_state.h"
 #include <windows.h>
-#include <functional>
 #include <vector>
 
 class GuiDashboard {
 public:
-    // on_retry：点了"重试"（完全重跑）；on_abort：点了"中止"（立即打断）
-    GuiDashboard(HINSTANCE hInstance, std::vector<DeviceState*>& states,
-                 std::function<void(size_t)> on_retry = {},
-                 std::function<void(size_t)> on_abort = {});
+    GuiDashboard(HINSTANCE hInstance, std::vector<DeviceState*>& states);
     ~GuiDashboard();
     void run();
 
@@ -21,11 +17,10 @@ private:
     void on_disconnect(int idx);
     void on_retry(int idx);
     void on_abort(int idx);
+    void post_request(int idx, int request);
 
     HINSTANCE hInstance_;
     std::vector<DeviceState*>& states_;
-    std::function<void(size_t)> on_retry_;
-    std::function<void(size_t)> on_abort_;
     HWND hwnd_ = nullptr;
     std::vector<HWND> lbl_status_;
     std::vector<HWND> btn_wait_;

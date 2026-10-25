@@ -9,10 +9,14 @@
 #ifndef CRBOT_VERSION
 #define CRBOT_VERSION "dev"
 #endif
-#include <list>
-#include <set>
-#include <vector>
+#include <atomic>
+#include <chrono>
 #include <future>
+#include <list>
+#include <mutex>
+#include <set>
+#include <thread>
+#include <vector>
 
 namespace {
 
@@ -42,16 +46,21 @@ std::string device_identity(const std::string& host) {
 }  // namespace
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
+#if !defined(NDEBUG)
+    // 只有 Debug 版才开控制台；Release 版不留终端窗口
     AllocConsole();
     FILE* dummy;
     freopen_s(&dummy, "CONOUT$", "w", stdout);
     freopen_s(&dummy, "CONOUT$", "w", stderr);
     setvbuf(stdout, nullptr, _IONBF, 0);
     SetConsoleOutputCP(CP_UTF8);  // 中文日志别变乱码
+#endif
 
-    // 控制台的输出同时写一份到 crbot.log（在 exe 同目录/当前工作目录）
+    // 控制台（如果有）和 crbot.log 双写
     if (start_log_tee("crbot.log")) {
+#if !defined(NDEBUG)
         std::cout << "[LOG] writing to crbot.log" << std::endl;
+#endif
     }
     std::cout << "[CRBOT] version " CRBOT_VERSION << std::endl;
 
@@ -118,20 +127,36 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
         }
         for (auto* r : runner_ptrs) r->start();
 
-        // 3. 启动 GUI。
-        //    Retry = 玩家人工介入后，从"连设备"那一步完全重跑（复用 BotRunner::run）；
-        //    Stop  = 立即打断，连正在执行的 adb 命令一起杀掉。
-        GuiDashboard gui(
-            hInstance, state_ptrs,
-            [runner_ptrs](size_t i) {
-                if (i < runner_ptrs.size()) runner_ptrs[i]->restart();
-            },
-            [runner_ptrs](size_t i) {
-                if (i < runner_ptrs.size()) runner_ptrs[i]->abort();
-            });
+        // 3. 监视线程：GUI 只登记请求，真正的 stop/join/start 在这里做。
+        //    界面线程绝不能阻塞在 join() 上（机器人可能正卡在 adb 调用里）。
+        std::atomic<bool> quitting{false};
+        std::thread supervisor([&] {
+            while (!quitting) {
+                for (size_t i = 0; i < runner_ptrs.size() && i < state_ptrs.size(); ++i) {
+                    int req = 0;
+                    {
+                        std::lock_guard<std::mutex> lk(state_ptrs[i]->mtx);
+                        req = state_ptrs[i]->request;
+                        state_ptrs[i]->request = 0;
+                    }
+                    if (req == 2) {
+                        runner_ptrs[i]->abort();
+                    } else if (req == 1) {
+                        runner_ptrs[i]->restart();
+                    }
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+        });
+
+        // 4. GUI：Retry = 整台重跑；Stop = 立即打断
+        GuiDashboard gui(hInstance, state_ptrs);
         gui.run();
 
-        // 4. 退出：停止所有线程
+        quitting = true;
+        supervisor.join();
+
+        // 5. 退出：停止所有线程
         for (auto& r : runners) r.stop();
         for (auto& r : runners) r.join();
 
