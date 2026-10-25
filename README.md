@@ -2,6 +2,8 @@
 
 **版本 0.0.1（pre-release）** · [更新日志](CHANGELOG.md) · [圣水识别方案](docs/圣水识别方案.md)
 
+> 🤖 **本项目的全部代码与文档完全由 DeepSeek 制作。**
+
 《皇室战争》国服（`com.tencent.tmgp.supercell.clashroyale`）自动化机器人。
 Windows 桌面程序，通过 ADB 驱动 MuMu / 雷电等 **720×1280** 模拟器，自动循环打 1v1 对战。
 图形界面（Win32）显示每台模拟器的状态，需要时可人工介入。
@@ -54,7 +56,7 @@ cmake --build cmake-build-debug
 ## 打包预发布版
 
 ```powershell
-# Windows PowerShell 或 pwsh 都行（脚本带 BOM，5.1 也能读）
+# Windows PowerShell 或 pwsh 都行
 powershell -File tools\package.ps1
 
 # 已经用 CLion 构建过，只打包
@@ -189,3 +191,13 @@ GUI 每台设备一行，右侧按钮：
 * 出牌是节奏型，不防守、不针对卡组；
 * 赛季专属活动页是纯动画，只能靠点空白处推进；
 * 详见 [CHANGELOG.md](CHANGELOG.md) 的"已知限制"。
+
+## 关于
+
+本项目的全部代码与文档**完全由 DeepSeek 制作**——从圣水条的像素几何标定、模板匹配、对局/对局外
+两个循环的设计，到 README 与识别方案文档，均由 DeepSeek 生成并迭代完成。
+
+人类提供的是需求、对局录像帧、按钮截图，以及在真机上跑日志、反馈问题。
+包括"卡牌压暗即不可打""双倍圣水该降到 8 费""奖励页是动画只能点空白处"这些关键结论，
+也是在一轮轮真实日志反馈中被纠正和沉淀下来的。
+
