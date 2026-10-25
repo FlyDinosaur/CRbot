@@ -1,11 +1,18 @@
-"""Scan all match frames and measure the elixir bar (fixed band, robust classifier)."""
+"""Scan all match frames and measure the elixir bar (fixed band, robust classifier).
+
+帧目录：命令行第 1 个参数 > 环境变量 CRBOT_FRAMES > ./frames
+输出：同目录下的 frames_elixir.csv
+"""
 import csv
 import os
+import sys
+
 from PIL import Image
 import numpy as np
 
-FRAMES = r"D:\file\Users\nya\Documents\MuMu共享文件夹\VideoRecords\frames"
-OUT = r"D:\file\CRBot\tools\frames_elixir.csv"
+HERE = os.path.dirname(os.path.abspath(__file__))
+FRAMES = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("CRBOT_FRAMES", "frames")
+OUT = os.path.join(HERE, "frames_elixir.csv")
 
 X0, X1 = 195, 695
 SEG = 50.0

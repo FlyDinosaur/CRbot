@@ -1,10 +1,18 @@
-"""Build a validation montage: bar crops with the computed elixir value."""
+"""Build a validation montage: bar crops with the computed elixir value.
+
+帧目录：命令行第 1 个参数 > 环境变量 CRBOT_FRAMES > ./frames
+输入 CSV 与输出 PNG 都在本脚本所在目录。
+"""
 import csv
+import os
+import sys
+
 from PIL import Image, ImageDraw
 
-FRAMES = r"D:\file\Users\nya\Documents\MuMu共享文件夹\VideoRecords\frames"
-CSV = r"D:\file\CRBot\tools\frames_elixir.csv"
-OUT = r"D:\file\CRBot\tools\elixir_validation.png"
+HERE = os.path.dirname(os.path.abspath(__file__))
+FRAMES = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("CRBOT_FRAMES", "frames")
+CSV = os.path.join(HERE, "frames_elixir.csv")
+OUT = os.path.join(HERE, "elixir_validation.png")
 
 rows = {int(r["frame"]): r for r in csv.DictReader(open(CSV, encoding="utf-8"))}
 picks = [32, 500, 900, 1200, 1500, 1800, 2100, 2400, 2600, 2750, 2830, 2870]
@@ -12,7 +20,7 @@ picks = [32, 500, 900, 1200, 1500, 1800, 2100, 2400, 2600, 2750, 2830, 2870]
 crops = []
 for n in picks:
     r = rows[n]
-    img = Image.open(f"{FRAMES}\\{n:06d}.png").convert("RGB").crop((130, 1205, 710, 1275))
+    img = Image.open(os.path.join(FRAMES, f"{n:06d}.png")).convert("RGB").crop((130, 1205, 710, 1275))
     crops.append((n, r, img))
 
 W, H = 580, 70

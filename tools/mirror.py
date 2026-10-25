@@ -8,7 +8,7 @@ import sys
 import numpy as np
 from PIL import Image
 
-FRAMES = r"D:\file\Users\nya\Documents\MuMu共享文件夹\VideoRecords\frames"
+FRAMES = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("CRBOT_FRAMES", "frames")
 
 # ---- 与 default_elixir_bar() 一致（整数运算，避免浮点取整误差）----
 W, H = 720, 1280

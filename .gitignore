@@ -10,6 +10,9 @@ crbot_debug.png
 crbot_battle_*.png
 tmp/
 
+# 离线工具生成的中间文件
+tools/frames_elixir.csv
+
 # IDE / 系统
 .idea/
 .vs/

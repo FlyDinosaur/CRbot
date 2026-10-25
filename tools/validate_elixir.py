@@ -1,8 +1,12 @@
 """Validate elixir curve: slope should be 1/2.8 per second; plays show drops."""
 import csv
+import os
+import sys
+
 import numpy as np
 
-CSV = r"D:\file\CRBot\tools\frames_elixir.csv"
+HERE = os.path.dirname(os.path.abspath(__file__))
+CSV = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "frames_elixir.csv")
 rows = list(csv.DictReader(open(CSV, encoding="utf-8")))
 FPS = 60.0
 X0, SEG = 195.0, 50.0

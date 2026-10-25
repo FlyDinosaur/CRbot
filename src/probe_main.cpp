@@ -57,14 +57,6 @@ static fs::path default_root() {
                         L"VideoRecords" / L"frames";
         if (fs::is_directory(cand, ec)) return cand;
     }
-
-    // 本机 MuMu 把共享目录指到了 D:\file，帧就在下面这个位置。
-    // 换机器时删掉这一段即可，或者用 CRBOT_FRAMES 环境变量覆盖。
-    {
-        fs::path cand = L"D:\\file\\Users\\nya\\Documents\\MuMu\u5171\u4eab\u6587\u4ef6\u5939"
-                        L"\\VideoRecords\\frames";
-        if (fs::is_directory(cand, ec)) return cand;
-    }
     return {};
 }
 
@@ -91,9 +83,7 @@ int main() {
                      "  2. exe 所在目录及其各级上级目录下的 frames\\\n"
                      "  3. %%USERPROFILE%%\\Documents\\MuMu共享文件夹\\VideoRecords\\frames\n"
                      "都找不到，就在 CLion 里 Run -> Edit Configurations ->\n"
-                     "Program arguments 填上帧目录，例如：\n"
-                     "  D:\\file\\Users\\nya\\Documents\\MuMu\xe5\x85\xb1\xe4\xba\xab\xe6\x96\x87\xe4\xbb\xb6\xe5\xa4\xb9"
-                     "\\VideoRecords\\frames\n");
+                     "Program arguments 填上帧目录，或者设置环境变量 CRBOT_FRAMES。\n");
         if (wargv) LocalFree(wargv);
         return 0;  // 用法提示不算失败
     }

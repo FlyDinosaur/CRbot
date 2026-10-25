@@ -1,15 +1,21 @@
-"""Validate the card-availability rule (dim = unaffordable) against elixir readings."""
+"""Validate the card-availability rule (dim = unaffordable) against elixir readings.
+
+帧目录：命令行第 1 个参数 > 环境变量 CRBOT_FRAMES > ./frames
+"""
 import csv
 import os
+import sys
+
 from PIL import Image
 import numpy as np
 
-FRAMES = r"D:\file\Users\nya\Documents\MuMu共享文件夹\VideoRecords\frames"
+HERE = os.path.dirname(os.path.abspath(__file__))
+FRAMES = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("CRBOT_FRAMES", "frames")
 SLOTS = [(175, 300), (305, 430), (435, 560), (565, 690)]
 ART_Y = (1080, 1160)
 
 rows = {int(r["frame"]): r for r in csv.DictReader(
-    open(r"D:\file\CRBot\tools\frames_elixir.csv", encoding="utf-8"))}
+    open(os.path.join(HERE, "frames_elixir.csv"), encoding="utf-8"))}
 
 files = sorted(os.listdir(FRAMES))[::7]
 viol_low = []
