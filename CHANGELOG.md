@@ -1,6 +1,8 @@
 # 更新日志
 
-## 未发布 — macOS 移植
+## 0.1.0 — 2026-10-25
+
+macOS 原生支持，外加 Windows 侧的编译修复。
 
 * **macOS 可原生编译运行**（Apple Silicon / Intel，clang + CMake），不再需要 MSVC。
 * 新增平台层：`platform_*` 负责可执行文件目录与 adb 查找，`proc_*` 负责子进程与管道
@@ -19,6 +21,11 @@
 * 修复子进程管道 EOF 后 `poll` 一直返回 `POLLHUP` 导致的空转（29 个端口探测一度烧掉 7 秒 CPU）。
 * 离线工具 `elixir_probe` / `ui_probe` 在两个平台都能编译；路径参数改用
   `std::filesystem::path`，以便同时支持 Windows 宽字符路径和 macOS 的 UTF-8 路径。
+* Windows 侧补掉两处编译错误：`log_tee.cpp` 的 Windows 分支混入了 POSIX 的
+  `shutdown_tee`，`probe_main.cpp` 缺少 `NOMINMAX` 导致 `std::max` 被宏顶掉。
+  同时让 Windows 退出时也把管道里剩余的日志写完。
+* 新增 `tools/package_macos.sh`：构建 Release、ad-hoc 签名并打包
+  `dist/CRBot-<版本>-macos-<arch>.zip`。
 
 ## 0.0.1 (pre-release) — 2026-10-25
 

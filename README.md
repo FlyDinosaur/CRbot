@@ -1,6 +1,6 @@
 # CRBot
 
-**版本 0.0.1（pre-release）** · [更新日志](CHANGELOG.md) · [圣水识别方案](docs/圣水识别方案.md) · **[GPL-3.0](LICENSE)**
+**版本 0.1.0** · [更新日志](CHANGELOG.md) · [圣水识别方案](docs/圣水识别方案.md) · **[GPL-3.0](LICENSE)**
 
 > 🤖 **本项目的全部代码与文档完全由 DeepSeek 制作。**
 
@@ -128,16 +128,39 @@ powershell -File tools\package.ps1 -SkipBuild -BuildDir .\build-release
 脚本会自己找 `vcvars64.bat` 和 CLion 自带的 cmake+ninja，构建 `RelWithDebInfo`，输出：
 
 ```
-dist\CRBot-0.0.1-win64\
+dist\CRBot-0.1.0-win64\
     CRbot.exe
     assets\templates\btn_*.png      ← 4 个模板
     assets\README.md
     docs\圣水识别方案.md
     README.md  CHANGELOG.md  VERSION
-dist\CRBot-0.0.1-win64.zip
+dist\CRBot-0.1.0-win64.zip
 ```
 
 版本号只写在 `VERSION` 文件里，CMake 和打包脚本都从它读；发新版只改那一个文件。
+
+## 打包 macOS 版
+
+```bash
+tools/package_macos.sh               # 构建 Release（build-release）并打包
+tools/package_macos.sh --skip-build  # 只打包已有产物
+```
+
+输出：
+
+```
+dist/CRBot-0.1.0-macos-arm64/
+    CRbot
+    assets/templates/btn_*.png
+    assets/README.md
+    docs/圣水识别方案.md
+    README.md  CHANGELOG.md  VERSION  LICENSE  THIRD_PARTY_NOTICES.md
+dist/CRBot-0.1.0-macos-arm64.zip
+```
+
+脚本只做 **ad-hoc 签名**（`codesign --sign -`），没有 Apple 开发者签名和公证：
+拷到别的 Mac 上、或者从浏览器下载后，Gatekeeper 仍可能拦一次，
+需要右键「打开」，或者 `xattr -dr com.apple.quarantine <目录>`。
 
 ## 离线回归
 
@@ -253,7 +276,7 @@ macOS 的终端面板按键和上面一一对应：`s` = Stop，`r` = Retry，`w
 
 ## 真机上第一次跑，重点看这几行日志
 
-1. `[CRBOT] version 0.0.1` + 4 行 `[UI] loaded btn_*.png` —— 素材就位；
+1. `[CRBOT] version 0.1.0` + 4 行 `[UI] loaded btn_*.png` —— 素材就位；
 2. `[NAV] battle button at (365,1000) score 0.9x, tapping` —— 主界面识别到了；
    没生效会自动 `tap did not take effect, retry 1/3`；
 3. `[NAV] 经典1对1 at (358,973) score 0.9x` —— 模式菜单选对了；
