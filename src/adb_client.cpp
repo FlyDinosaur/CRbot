@@ -473,17 +473,18 @@ std::vector<uint8_t> AdbClient::run_adb_binary(const std::string& args) {
     return run_process_binary(build_cmd_line(get_adb_path(), serial_, args), &cancel_);
 }
 
-// 从别的线程打断：杀掉当前 adb 子进程 + 关掉常驻 shell。
-// 被打断的线程会从 ReadFile 立刻返回，随后因为 cancelled 直接抛错退出。
+// 从别的线程打断：杀掉当前正在跑的 adb 子进程（screencap 这类）。
+// 被打断的线程会从 ReadFile 立刻返回，随后因为 cancelled 之后的命令直接失败。
+//
+// 注意：这里**不**去 stop 常驻 shell 会话 —— 那个句柄可能正被机器人线程读着，
+// 跨线程关句柄是 UB。改成只置 cancelled：会话不再接受新命令，
+// 等 Device 析构时自然关闭。代价是卡在 tap 上的线程最多多等它自己的 8 秒超时。
 void AdbClient::cancel() {
-    {
-        std::lock_guard<std::mutex> lk(cancel_.mtx);
-        cancel_.cancelled = true;
-        if (cancel_.proc) {
-            TerminateProcess(static_cast<HANDLE>(cancel_.proc), 1);
-        }
+    std::lock_guard<std::mutex> lk(cancel_.mtx);
+    cancel_.cancelled = true;
+    if (cancel_.proc) {
+        TerminateProcess(static_cast<HANDLE>(cancel_.proc), 1);
     }
-    if (session_) session_->stop();
 }
 
 std::vector<uint8_t> AdbClient::screenshot_raw() {
