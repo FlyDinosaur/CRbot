@@ -76,6 +76,8 @@ New-Item -ItemType Directory -Force -Path $pkgAssets | Out-Null
 Copy-Item (Join-Path $root "assets\templates") $pkgAssets -Recurse
 Copy-Item (Join-Path $root "assets\README.md") $pkgAssets
 Copy-Item (Join-Path $root "README.md"), (Join-Path $root "CHANGELOG.md"), (Join-Path $root "VERSION") $pkgDir
+# GPL-3.0 要求分发二进制时随附许可证与第三方声明
+Copy-Item (Join-Path $root "LICENSE"), (Join-Path $root "THIRD_PARTY_NOTICES.md") $pkgDir
 New-Item -ItemType Directory -Force -Path (Join-Path $pkgDir "docs") | Out-Null
 Copy-Item (Join-Path $root "docs\圣水识别方案.md") (Join-Path $pkgDir "docs")
 

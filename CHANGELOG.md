@@ -4,6 +4,9 @@
 
 首个可运行的预发布版：多开模拟器、自动打完一整局并循环。
 
+**许可证：[GPL-3.0](LICENSE)**（强 copyleft：分发二进制时须同样开放源码）。
+内嵌的 adb 按 Apache-2.0 分发，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
 ### 对局内
 
 * **圣水识别**：直接读底部圣水条（720x1280 实测 10 格 × 50px），

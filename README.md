@@ -1,6 +1,6 @@
 # CRBot
 
-**版本 0.0.1（pre-release）** · [更新日志](CHANGELOG.md) · [圣水识别方案](docs/圣水识别方案.md)
+**版本 0.0.1（pre-release）** · [更新日志](CHANGELOG.md) · [圣水识别方案](docs/圣水识别方案.md) · **[GPL-3.0](LICENSE)**
 
 > 🤖 **本项目的全部代码与文档完全由 DeepSeek 制作。**
 
@@ -191,6 +191,22 @@ GUI 每台设备一行，右侧按钮：
 * 出牌是节奏型，不防守、不针对卡组；
 * 赛季专属活动页是纯动画，只能靠点空白处推进；
 * 详见 [CHANGELOG.md](CHANGELOG.md) 的"已知限制"。
+
+## 许可证
+
+**GNU General Public License v3.0**（GPL-3.0），全文见 [LICENSE](LICENSE)。
+
+GPL-3.0 是**强 copyleft（传染性）**许可证：
+
+* 你可以自由使用、修改、分发；
+* 但**分发（包括只发编译好的 exe）时必须同样以 GPL-3.0 开放完整源码**，
+  并保留版权声明与"无担保"声明；
+* 把本项目代码并入其它程序，那个程序也会被"传染"成 GPL-3.0。
+
+> 也就是说：**发二进制就要给源码**。本仓库就是源码，分发时把仓库地址一并给出即可。
+
+内嵌的 `adb` 来自 Android SDK Platform-Tools，按 Apache-2.0 分发，
+其版权与许可声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## 关于
 

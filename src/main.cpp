@@ -63,6 +63,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 #endif
     }
     std::cout << "[CRBOT] version " CRBOT_VERSION << std::endl;
+    // GPL-3.0 §5d：交互式程序要给出法律声明
+    std::cout << "[CRBOT] Copyright (C) 2026 CRBot contributors\n"
+                 "[CRBOT] GPL-3.0-or-later, absolutely no warranty\n"
+                 "[CRBOT] full terms in LICENSE; source: this project's repository"
+              << std::endl;
 
     try {
         // 0. 先把 adb 守护进程拉起来（起不来的话这里就会报错，见控制台）
