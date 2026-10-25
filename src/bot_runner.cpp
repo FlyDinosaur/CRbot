@@ -48,6 +48,11 @@ void BotRunner::stop() {
         state_.user_response = 2;  // disconnect
     }
     state_.cv.notify_all();
+
+    // 一起打断正在执行的 adb 命令：否则 join() 要等截图那个 60 秒超时，
+    // 退出程序时看起来就是"卡住不动"。
+    std::lock_guard<std::mutex> lk(adb_mtx_);
+    if (adb_) adb_->cancel();
 }
 
 void BotRunner::join() {
@@ -117,10 +122,10 @@ void BotRunner::run() {
                           "x" + std::to_string(device.height()));
 
         CRGame game(device);
-        game.ensure_running();
+        game.ensure_running(&stop_);
         state_.set_status("Game launched");
 
-        if (!game.wait_for_main_menu(&state_)) {
+        if (!game.wait_for_main_menu(&state_, 60, &stop_)) {
             state_.set_status("Disconnected by user");
             state_.running = false;
             return;

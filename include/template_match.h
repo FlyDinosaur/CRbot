@@ -1,5 +1,6 @@
 #pragma once
 #include "image.h"
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -13,7 +14,7 @@ struct Rect {
 // 一块按钮模板（灰度 + 尺寸），只在加载时算一次统计量
 class Template {
 public:
-    static Template load(const std::wstring& png, std::string* err = nullptr);
+    static Template load(const std::filesystem::path& png, std::string* err = nullptr);
     static Template from_image(const Image& img);
 
     int width() const { return w_; }

@@ -21,3 +21,7 @@
 Apache-2.0 与 GPL-3.0 兼容（Apache-2.0 第 4 节、GPL-3.0 第 7 节），本程序把 adb 作为
 独立可执行文件调用，不修改它；adb 的许可与版权声明在本文件中保留，不因本项目整体适用
 GPL-3.0 而失效。
+
+> macOS 版**不内嵌** adb：运行时使用系统里已安装的 `adb`（例如
+> `brew install --cask android-platform-tools`），本仓库不附带也不分发 adb 二进制。
+> 上面这些声明是对 Windows 版内嵌副本的说明，仍然有效。

@@ -1,5 +1,25 @@
 # 更新日志
 
+## 未发布 — macOS 移植
+
+* **macOS 可原生编译运行**（Apple Silicon / Intel，clang + CMake），不再需要 MSVC。
+* 新增平台层：`platform_*` 负责可执行文件目录与 adb 查找，`proc_*` 负责子进程与管道
+  （Windows 用 `CreateProcess`，macOS 用 `posix_spawn` + `poll`）。两边都保留
+  "不等管道 EOF、只等直接子进程退出"的逻辑，避免 adb 守护进程占着写端导致卡死。
+* macOS 不内嵌 `adb.exe`，按 `CRBOT_ADB` > `PATH` > Android SDK / Homebrew 的顺序找系统 adb。
+* PNG 解码在 macOS 上改用系统的 ImageIO（Windows 仍用 WIC）。
+* 控制界面换成终端面板：设备状态 + 实时日志滚动区，按键 `s/r/w/d` 对应
+  Stop / Retry / Wait / Disconnect，`q` 退出；没有终端时自动退化成行模式。
+* 设备发现增加 `adb devices`，USB 真机和 Android Studio 的 `emulator-5554` 也能识别；
+  端口扫描（5555~5599 等）保留给本地模拟器。
+* 退出/Stop 现在会一起打断正在执行的 adb 命令，也会打断"等游戏启动"和"等主界面"的睡眠，
+  不用再等满 60 秒。
+* 修复 macOS 日志转发的两个问题：后台线程不能 detach 后随静态析构 terminate；
+  控制台写入必须走 dup 出来的原始 stdout，否则日志会写回自己的管道形成死循环。
+* 修复子进程管道 EOF 后 `poll` 一直返回 `POLLHUP` 导致的空转（29 个端口探测一度烧掉 7 秒 CPU）。
+* 离线工具 `elixir_probe` / `ui_probe` 在两个平台都能编译；路径参数改用
+  `std::filesystem::path`，以便同时支持 Windows 宽字符路径和 macOS 的 UTF-8 路径。
+
 ## 0.0.1 (pre-release) — 2026-10-25
 
 首个可运行的预发布版：多开模拟器、自动打完一整局并循环。

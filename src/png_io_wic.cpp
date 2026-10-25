@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <vector>
 
 namespace {
@@ -83,12 +84,12 @@ bool decode_first_frame(IWICImagingFactory* factory, IWICBitmapDecoder* decoder,
 
 }  // namespace
 
-bool load_png(const std::wstring& path, Image& out, std::string* err) {
+bool load_png(const std::filesystem::path& path, Image& out, std::string* err) {
     IWICImagingFactory* factory = wic_factory(err);
     if (!factory) return false;
 
     IWICBitmapDecoder* decoder = nullptr;
-    HRESULT hr = factory->CreateDecoderFromFilename(path.c_str(), nullptr, GENERIC_READ,
+    HRESULT hr = factory->CreateDecoderFromFilename(path.wstring().c_str(), nullptr, GENERIC_READ,
                                                     WICDecodeMetadataCacheOnLoad, &decoder);
     if (FAILED(hr) || !decoder) {
         safe_release(factory);

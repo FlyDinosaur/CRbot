@@ -1,9 +1,13 @@
 #include "log_tee.h"
 
+#if defined(_WIN32)
+
 #include <windows.h>
 
 #include <fcntl.h>
 #include <io.h>
+
+#include <mutex>
 
 namespace {
 
@@ -27,6 +31,21 @@ DWORD WINAPI pump(LPVOID) {
         }
     }
     return 0;
+}
+
+// 进程退出前把管道里剩下的日志读干净再走。
+// 不这么做的话，`main` 里最后几行（尤其是"没有找到设备"这种）会随进程一起丢掉。
+void shutdown_tee() {
+    std::cout.flush();
+    std::cerr.flush();
+    std::fflush(nullptr);
+    if (g_pipe_write >= 0) {
+        ::close(g_pipe_write);
+        g_pipe_write = -1;
+    }
+    ::close(STDOUT_FILENO);
+    ::close(STDERR_FILENO);
+    if (g_thread.joinable()) g_thread.join();
 }
 
 }  // namespace
@@ -74,3 +93,140 @@ bool start_log_tee(const char* path) {
     _dup2(fd, 2);
     return true;
 }
+
+// Windows 的界面不是终端面板，不需要订阅日志。
+void set_log_sink(LogSink*) {}
+
+#else  // POSIX（macOS）
+
+#include <fcntl.h>
+#include <signal.h>
+#include <unistd.h>
+
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
+#include <mutex>
+#include <thread>
+
+namespace {
+
+int g_file = -1;
+int g_pipe_read = -1;
+int g_pipe_write = -1;
+int g_console_fd = -1;  // dup 出来的原始 stdout：dup2 之后 fd 1 已经是管道了
+std::thread g_thread;
+std::mutex g_sink_mtx;
+LogSink* g_sink = nullptr;  // 受 g_sink_mtx 保护
+
+void emit(const char* data, size_t size) {
+    LogSink* sink = nullptr;
+    {
+        std::lock_guard<std::mutex> lk(g_sink_mtx);
+        sink = g_sink;
+    }
+    if (sink) {
+        sink->on_log(data, size);
+        return;
+    }
+    if (g_console_fd < 0) return;
+    size_t off = 0;
+    while (off < size) {
+        const ssize_t n = ::write(g_console_fd, data + off, size - off);
+        if (n > 0) {
+            off += static_cast<size_t>(n);
+            continue;
+        }
+        if (n < 0 && errno == EINTR) continue;
+        break;
+    }
+}
+
+void pump() {
+    char buf[4096];
+    for (;;) {
+        const ssize_t n = ::read(g_pipe_read, buf, sizeof buf);
+        if (n > 0) {
+            if (g_file >= 0) {
+                size_t off = 0;
+                while (off < static_cast<size_t>(n)) {
+                    const ssize_t w = ::write(g_file, buf + off, static_cast<size_t>(n) - off);
+                    if (w > 0) {
+                        off += static_cast<size_t>(w);
+                        continue;
+                    }
+                    if (w < 0 && errno == EINTR) continue;
+                    break;
+                }
+                ::fsync(g_file);  // 崩了也不丢日志
+            }
+            emit(buf, static_cast<size_t>(n));
+            continue;
+        }
+        if (n < 0 && errno == EINTR) continue;
+        break;
+    }
+}
+
+// 进程退出前把管道里剩下的日志读干净再走。
+// 不这么做的话，`main` 里最后几行（尤其是"没有找到设备"这种）会随进程一起丢掉。
+void shutdown_tee() {
+    std::cout.flush();
+    std::cerr.flush();
+    std::fflush(nullptr);
+    if (g_pipe_write >= 0) {
+        ::close(g_pipe_write);
+        g_pipe_write = -1;
+    }
+    ::close(STDOUT_FILENO);
+    ::close(STDERR_FILENO);
+    if (g_thread.joinable()) g_thread.join();
+}
+
+}  // namespace
+
+bool start_log_tee(const char* path) {
+    // 子进程死掉后写管道会拿到 SIGPIPE，直接杀进程；日志场景一律忽略
+    ::signal(SIGPIPE, SIG_IGN);
+
+    int fds[2] = {-1, -1};
+    if (::pipe(fds) != 0) return false;
+    const int file = ::open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (file < 0) {
+        ::close(fds[0]);
+        ::close(fds[1]);
+        return false;
+    }
+
+    // UTF-8 BOM
+    const char bom[] = "\xEF\xBB\xBF";
+    if (::write(file, bom, 3) != 3) {
+        ::close(file);
+        ::close(fds[0]);
+        ::close(fds[1]);
+        return false;
+    }
+
+    g_file = file;
+    g_pipe_read = fds[0];
+    g_console_fd = ::dup(STDOUT_FILENO);
+
+    // stdout 换成管道后默认是全缓冲，日志会看起来"卡住"；改成行缓冲。
+    std::setvbuf(stdout, nullptr, _IOLBF, 0);
+
+    g_pipe_write = fds[1];
+    g_thread = std::thread(pump);
+    std::atexit(shutdown_tee);
+    if (::dup2(fds[1], STDOUT_FILENO) < 0 || ::dup2(fds[1], STDERR_FILENO) < 0) {
+        return false;
+    }
+    return true;
+}
+
+void set_log_sink(LogSink* sink) {
+    std::lock_guard<std::mutex> lk(g_sink_mtx);
+    g_sink = sink;
+}
+
+#endif

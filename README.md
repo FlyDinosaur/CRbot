@@ -5,8 +5,8 @@
 > 🤖 **本项目的全部代码与文档完全由 DeepSeek 制作。**
 
 《皇室战争》国服（`com.tencent.tmgp.supercell.clashroyale`）自动化机器人。
-Windows 桌面程序，通过 ADB 驱动 MuMu / 雷电等 **720×1280** 模拟器，自动循环打 1v1 对战。
-图形界面（Win32）显示每台模拟器的状态，需要时可人工介入。
+通过 ADB 驱动 **720×1280** 的模拟器 / 真机，自动循环打 1v1 对战。
+Windows 上是 Win32 窗口，macOS 上是终端面板，都显示每台设备的状态，需要时可人工介入。
 
 ## 现在能做什么
 
@@ -35,7 +35,7 @@ Windows 桌面程序，通过 ADB 驱动 MuMu / 雷电等 **720×1280** 模拟�
 落点固定 **(360, 695)**（河边中央），卡槽 **1 → 2 → 3 → 4** 轮转。
 没有敌方部队/塔血识别，所以还谈不上"会防守"。
 
-## 编译
+## 编译（Windows）
 
 需要 Visual Studio（MSVC，C++23）和 CMake ≥ 3.20。
 `adb.exe` 已经以二进制数组形式编进程序（`src/adb_resource.cpp`，所以**首次全量编译会慢几分钟**）。
@@ -52,6 +52,68 @@ cmake --build cmake-build-debug
 | `ui_probe.exe` | 离线工具：验证按钮模板在一个画面里的匹配分和位置 |
 
 > Debug 版会弹控制台；Release 版不弹，日志只写 `crbot.log`（见下文）。
+
+## 编译与运行（macOS）
+
+需要 Xcode Command Line Tools（clang + macOS SDK）、CMake ≥ 3.20，以及一份 `adb`：
+
+```bash
+xcode-select --install                          # 没装过才需要
+brew install --cask android-platform-tools      # 只装 adb，不需要整个 Android Studio
+```
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j8
+./build/CRbot
+
+# 手边没有设备时，可以先验一遍整条链路（假 adb + 假截图，2 秒出结果）
+tools/smoke_macos.sh build
+```
+
+程序按顺序找 adb：`CRBOT_ADB` 环境变量 > `PATH` > `~/Library/Android/sdk/platform-tools/adb`
+> Homebrew / MacPorts 的常见位置。找不到会直接报错并提示安装命令。
+
+和 Windows 版的差别：
+
+| | Windows | macOS |
+|---|---|---|
+| 控制界面 | Win32 窗口（按钮） | 终端面板，日志在下方实时滚动 |
+| adb | 内嵌 `adb.exe`，解压后使用 | 用系统 / SDK 里的 `adb` |
+| PNG 解码 | WIC | ImageIO |
+| 设备发现 | 扫 5555~5599 等模拟器端口 | 同上 + `adb devices`（USB 真机、Android Studio 模拟器） |
+
+终端面板按键：
+
+| 按键 | 作用 |
+|---|---|
+| `↑` / `↓` 或 `j` / `k` | 选择设备 |
+| `1`~`9` | 直接选第 N 台 |
+| `s` | **Stop**：立即打断（连正在执行的 adb 命令一起杀掉，不等 60 秒超时） |
+| `r` | **Retry**：从"连设备"那一步整台重跑 |
+| `w` / `d` | 登录超时等人工确认时：继续等 / 断开这台 |
+| `q` | 退出（会先停掉所有 adb 命令再退） |
+
+日志照旧双写：终端面板里看到的是 `crbot.log` 的实时镜像。
+stdin / stdout 不是终端时（CI、`nohup`）自动退化成行模式：状态变化按行打印，
+命令用 `stop N` / `retry N` / `wait N` / `disconnect N` / `quit`。
+
+### macOS 上没有 MuMu/雷电，怎么跑起来
+
+MuMu、雷电都是 Windows 程序。macOS 上可以用 Android Studio 的模拟器或一台真机，
+再把分辨率改成项目要求的 720×1280：
+
+```bash
+adb devices                       # 先确认设备连上了
+adb shell wm size 720x1280        # 临时覆盖分辨率
+adb shell wm density 240
+```
+
+`wm size` 是临时的，模拟器重启会恢复默认；想固定下来就在 AVD 里建一个 720×1280 的自定义设备。
+改完用 `adb shell wm size` 确认输出 `Physical size: 720x1280`，
+否则程序会在启动时报 `resolution ... != 720x1280` 并拒绝这台设备。
+
+> Windows 的 `tools/package.ps1` 只负责打包 Windows 版；macOS 直接从 `build/` 目录运行即可。
 
 ## 打包预发布版
 
@@ -103,8 +165,15 @@ dist\CRBot-0.0.1-win64.zip
 ```
 include/ src/
   adb_client.*     adb 调用（connect / screencap / tap / swipe / shell）
-                   常驻 shell 会话、可被打断的子进程、adb 提取
-  adb_resource.*   内嵌的 adb.exe
+                   常驻 shell 会话、可被打断的子进程
+  proc_win.cpp     子进程 + 管道（CreateProcess / HANDLE）
+  proc_posix.cpp   子进程 + 管道（posix_spawn / poll，可被 cancel 打断）
+  platform_win.cpp     可执行文件目录、路径拆分等小工具（Windows）
+  platform_posix.cpp   同上 + adb 查找（macOS：CRBOT_ADB > PATH > SDK / Homebrew）
+  adb_resolve_win.cpp  内嵌 adb.exe 的提取（仅 Windows）
+  adb_resource.*   内嵌的 adb.exe（仅 Windows，macOS 不编译）
+  png_io_wic.cpp   PNG 解码：WIC（Windows）
+  png_io_imageio.cpp PNG 解码：ImageIO（macOS）
   device.*         设备连接 + 分辨率校验（必须 720x1280）+ 截图（PNG 优先）
   image.*          RGBA 帧、screencap 解析、PNG 落盘（调试用）
   template_match.* ★ 归一化相关（NCC）模板匹配，粗扫 + 精修
@@ -115,8 +184,9 @@ include/ src/
   navigator.*      对局外：主界面导航、start_match、finish_match
   cr_game.*        进程/包名、启动游戏、等主界面
   bot_runner.*     单台设备的线程主流程 + Stop/Retry
-  gui_dashboard.*  Win32 状态面板
-  log_tee.*        控制台 + crbot.log 双写
+  gui_dashboard.*  Win32 状态面板（仅 Windows）
+  tui_dashboard.*  macOS 终端面板 + 日志滚动区
+  log_tee.*        控制台 + crbot.log 双写（macOS 可挂日志订阅）
   probe_main.cpp   离线回归工具入口（圣水/手牌）
   ui_probe.cpp     离线工具：验证按钮模板
 assets/
@@ -176,6 +246,10 @@ GUI 每台设备一行，右侧按钮：
 
 按钮只登记请求，真正的 stop/join/start 由主进程里的监视线程执行——
 界面线程从不阻塞，所以机器人卡在 adb 调用里时窗口也不会假死。
+
+macOS 的终端面板按键和上面一一对应：`s` = Stop，`r` = Retry，`w` = Wait，
+`d` = Disconnect，`q` = 退出。退出时也会先把正在跑的 adb 命令杀掉，
+不会卡在 60 秒超时上。
 
 ## 真机上第一次跑，重点看这几行日志
 

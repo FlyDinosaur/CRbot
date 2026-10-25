@@ -4,26 +4,26 @@
 // 输出 CSV：file,visible,segments,fill,hand
 #include "elixir.h"
 #include "hand.h"
+#include "platform.h"
 #include "png_io.h"
 
-// windows.h 默认把 min/max 定义成宏，会和 std::max 打架
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#include <shellapi.h>
-
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
-#include <cwctype>
 #include <filesystem>
 #include <string>
 #include <vector>
 
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
 namespace fs = std::filesystem;
 
-static const char* card_char(CardState s) {
+namespace {
+
+const char* card_char(CardState s) {
     switch (s) {
         case CardState::Ready: return "R";
         case CardState::Unaffordable: return "u";
@@ -33,43 +33,41 @@ static const char* card_char(CardState s) {
 }
 
 // 没给参数时的默认帧目录：环境变量 CRBOT_FRAMES > 从 exe 目录往上找 frames 子目录
-// > MuMu 默认共享目录
-static fs::path default_root() {
-    if (const wchar_t* env = _wgetenv(L"CRBOT_FRAMES"); env && *env) {
-        return fs::path(env);
-    }
+// > MuMu 默认共享目录（仅 Windows）
+fs::path default_root() {
+#if defined(_WIN32)
+    if (const wchar_t* env = _wgetenv(L"CRBOT_FRAMES"); env && *env) return fs::path(env);
+#else
+    if (const char* env = std::getenv("CRBOT_FRAMES"); env && *env) return fs::path(env);
+#endif
     std::error_code ec;
 
-    wchar_t buf[MAX_PATH] = {0};
-    if (GetModuleFileNameW(nullptr, buf, MAX_PATH) != 0) {
-        fs::path base = fs::path(buf).parent_path();
-        while (!base.empty()) {
-            fs::path cand = base / L"frames";
-            if (fs::is_directory(cand, ec)) return cand;
-            fs::path up = base.parent_path();
-            if (up == base) break;
-            base = up;
-        }
+    fs::path base = platform::exe_dir();
+    while (!base.empty()) {
+        const fs::path cand = base / "frames";
+        if (fs::is_directory(cand, ec)) return cand;
+        fs::path up = base.parent_path();
+        if (up == base) break;
+        base = up;
     }
 
+#if defined(_WIN32)
     if (const wchar_t* profile = _wgetenv(L"USERPROFILE"); profile && *profile) {
-        fs::path cand = fs::path(profile) / L"Documents" / L"MuMu\u5171\u4eab\u6587\u4ef6\u5939" /
-                        L"VideoRecords" / L"frames";
+        const fs::path cand = fs::path(profile) / L"Documents" / L"MuMu共享文件夹" /
+                              L"VideoRecords" / L"frames";
         if (fs::is_directory(cand, ec)) return cand;
     }
+#endif
     return {};
 }
 
-int main() {
-    int argc = 0;
-    LPWSTR* wargv = CommandLineToArgvW(GetCommandLineW(), &argc);
-
+int run(const std::vector<fs::path>& args) {
     // 参数优先级：命令行 > 环境变量 CRBOT_FRAMES > exe 所在目录往上找 frames 子目录
-    // 目的是让 CLion 里直接点 Run 也能跑起来，而不是只打印一句用法就退出。
+    // 目的是让 IDE 里直接点 Run 也能跑起来，而不是只打印一句用法就退出。
     fs::path root;
     int step = 1;
-    if (wargv && argc >= 2) root = wargv[1];
-    if (wargv && argc >= 3) step = std::max(1, std::stoi(std::wstring(wargv[2])));
+    if (args.size() >= 2) root = args[1];
+    if (args.size() >= 3) step = std::max(1, std::stoi(args[2].string()));
     if (root.empty()) root = default_root();
 
     if (root.empty()) {
@@ -80,11 +78,9 @@ int main() {
                      "\n"
                      "没给参数时，会依次尝试：\n"
                      "  1. 环境变量 CRBOT_FRAMES\n"
-                     "  2. exe 所在目录及其各级上级目录下的 frames\\\n"
-                     "  3. %%USERPROFILE%%\\Documents\\MuMu共享文件夹\\VideoRecords\\frames\n"
-                     "都找不到，就在 CLion 里 Run -> Edit Configurations ->\n"
-                     "Program arguments 填上帧目录，或者设置环境变量 CRBOT_FRAMES。\n");
-        if (wargv) LocalFree(wargv);
+                     "  2. exe 所在目录及其各级上级目录下的 frames/\n"
+                     "  3. %%USERPROFILE%%\\Documents\\MuMu共享文件夹\\VideoRecords\\frames"
+                     "（仅 Windows）\n");
         return 0;  // 用法提示不算失败
     }
 
@@ -93,24 +89,24 @@ int main() {
     if (fs::is_directory(root, ec)) {
         for (auto& e : fs::directory_iterator(root, ec)) {
             if (!e.is_regular_file()) continue;
-            std::wstring ext = e.path().extension().wstring();
+            std::string ext = e.path().extension().string();
             std::transform(ext.begin(), ext.end(), ext.begin(),
-                           [](wchar_t c) { return static_cast<wchar_t>(std::towlower(c)); });
-            if (ext == L".png") files.push_back(e.path());
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if (ext == ".png") files.push_back(e.path());
         }
         std::sort(files.begin(), files.end());
     } else {
         files.push_back(root);
     }
     if (files.empty()) {
-        std::fprintf(stderr, "no png found in %ls\n", root.c_str());
-        if (wargv) LocalFree(wargv);
+        std::fprintf(stderr, "no png found in %s\n", root.string().c_str());
         return 0;
     }
-    std::fprintf(stderr, "reading %zu png from %ls\n", files.size(), root.c_str());
-    if (wargv) LocalFree(wargv);
+    std::fprintf(stderr, "reading %zu png from %s\n", files.size(), root.string().c_str());
 
+#if defined(_WIN32)
     CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+#endif
 
     long long total = 0, visible = 0;
     long long hist[11] = {0};
@@ -120,8 +116,9 @@ int main() {
     for (size_t i = 0; i < files.size(); i += static_cast<size_t>(step)) {
         Image img;
         std::string err;
-        if (!load_png(files[i].wstring(), img, &err)) {
-            std::fprintf(stderr, "load failed: %ls (%s)\n", files[i].c_str(), err.c_str());
+        if (!load_png(files[i], img, &err)) {
+            std::fprintf(stderr, "load failed: %s (%s)\n", files[i].string().c_str(),
+                         err.c_str());
             ++failed_reads;
             continue;
         }
@@ -157,6 +154,21 @@ int main() {
     for (int i = 0; i <= 10; ++i) std::fprintf(stderr, " %d:%lld", i, hist[i]);
     std::fprintf(stderr, "\nframes with a playable card: %lld / %lld\n", ready_frames, visible);
 
+#if defined(_WIN32)
     CoUninitialize();
+#endif
     return 0;
+}
+
+}  // namespace
+
+#if defined(_WIN32)
+int wmain(int argc, wchar_t** argv) {
+#else
+int main(int argc, char** argv) {
+#endif
+    std::vector<fs::path> args;
+    args.reserve(static_cast<size_t>(argc));
+    for (int i = 0; i < argc; ++i) args.emplace_back(argv[i]);
+    return run(args);
 }

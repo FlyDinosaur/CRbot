@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 
 namespace {
 
@@ -60,7 +61,7 @@ Template Template::from_image(const Image& img) {
     return t;
 }
 
-Template Template::load(const std::wstring& png, std::string* err) {
+Template Template::load(const std::filesystem::path& png, std::string* err) {
     Image img;
     if (!load_png(png, img, err)) return {};
     return from_image(img);
