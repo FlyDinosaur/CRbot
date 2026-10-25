@@ -7,6 +7,9 @@
 #include <fcntl.h>
 #include <io.h>
 
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
 #include <mutex>
 
 namespace {
@@ -14,6 +17,8 @@ namespace {
 HANDLE g_console = INVALID_HANDLE_VALUE;
 HANDLE g_file = INVALID_HANDLE_VALUE;
 HANDLE g_pipe_read = INVALID_HANDLE_VALUE;
+HANDLE g_pump_thread = INVALID_HANDLE_VALUE;
+int g_pipe_write_fd = -1;  // 管道写端的 CRT fd（fd 1/2 是它的副本）
 
 DWORD WINAPI pump(LPVOID) {
     char buf[4096];
@@ -39,13 +44,20 @@ void shutdown_tee() {
     std::cout.flush();
     std::cerr.flush();
     std::fflush(nullptr);
-    if (g_pipe_write >= 0) {
-        ::close(g_pipe_write);
-        g_pipe_write = -1;
+
+    // CRT 的每个 fd 各持有一份句柄副本，三个都要关，管道写端才真正断开
+    if (g_pipe_write_fd >= 0) {
+        _close(g_pipe_write_fd);
+        g_pipe_write_fd = -1;
     }
-    ::close(STDOUT_FILENO);
-    ::close(STDERR_FILENO);
-    if (g_thread.joinable()) g_thread.join();
+    _close(1);
+    _close(2);
+
+    if (g_pump_thread != INVALID_HANDLE_VALUE) {
+        WaitForSingleObject(g_pump_thread, 2000);  // pump 读到 EOF 后会把剩余日志写完
+        CloseHandle(g_pump_thread);
+        g_pump_thread = INVALID_HANDLE_VALUE;
+    }
 }
 
 }  // namespace
@@ -76,7 +88,10 @@ bool start_log_tee(const char* path) {
     }
 
     g_pipe_read = read_end;
-    if (CreateThread(nullptr, 0, pump, nullptr, 0, nullptr) == nullptr) {
+
+    // 把 CRT 的 stdout / stderr 指向管道写端。
+    int fd = _open_osfhandle(reinterpret_cast<intptr_t>(write_end), _O_TEXT);
+    if (fd == -1) {
         CloseHandle(read_end);
         CloseHandle(write_end);
         CloseHandle(g_file);
@@ -84,13 +99,22 @@ bool start_log_tee(const char* path) {
         g_file = INVALID_HANDLE_VALUE;
         return false;
     }
+    g_pipe_write_fd = fd;
 
-    // 把 CRT 的 stdout / stderr 指向管道写端。
-    // fd 和 write_end 都故意不关：管道写端一关，后台线程就会收到 EOF 退出。
-    int fd = _open_osfhandle(reinterpret_cast<intptr_t>(write_end), _O_TEXT);
-    if (fd == -1) return false;
+    g_pump_thread = CreateThread(nullptr, 0, pump, nullptr, 0, nullptr);
+    if (g_pump_thread == nullptr) {
+        _close(fd);
+        g_pipe_write_fd = -1;
+        CloseHandle(read_end);
+        CloseHandle(g_file);
+        g_pipe_read = INVALID_HANDLE_VALUE;
+        g_file = INVALID_HANDLE_VALUE;
+        return false;
+    }
+
     _dup2(fd, 1);
     _dup2(fd, 2);
+    std::atexit(shutdown_tee);  // 退出前把管道里剩下的日志读干净
     return true;
 }
 

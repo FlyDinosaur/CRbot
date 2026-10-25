@@ -16,6 +16,10 @@
 #include <vector>
 
 #if defined(_WIN32)
+// windows.h 会定义 min/max 宏，把 std::max 顶掉（error C2589），先禁掉
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #endif
 
