@@ -1,4 +1,4 @@
-# 构建并打包 Windows 预发布版
+﻿# 构建并打包 Windows 预发布版
 #
 # 用法：
 #   pwsh -File tools\package.ps1                      # 自己构建（RelWithDebInfo）并打包
@@ -69,8 +69,12 @@ if (Test-Path $pkgDir) { Remove-Item $pkgDir -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $pkgDir | Out-Null
 
 Copy-Item $exe $pkgDir
-Copy-Item (Join-Path $root "assets\templates") $pkgDir -Recurse
-Copy-Item (Join-Path $root "assets\README.md") $pkgDir
+
+# 程序按 <exe>\assets\templates 找模板，所以要把 templates 放进 assets\ 下面
+$pkgAssets = Join-Path $pkgDir "assets"
+New-Item -ItemType Directory -Force -Path $pkgAssets | Out-Null
+Copy-Item (Join-Path $root "assets\templates") $pkgAssets -Recurse
+Copy-Item (Join-Path $root "assets\README.md") $pkgAssets
 Copy-Item (Join-Path $root "README.md"), (Join-Path $root "CHANGELOG.md"), (Join-Path $root "VERSION") $pkgDir
 New-Item -ItemType Directory -Force -Path (Join-Path $pkgDir "docs") | Out-Null
 Copy-Item (Join-Path $root "docs\圣水识别方案.md") (Join-Path $pkgDir "docs")
