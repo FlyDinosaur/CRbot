@@ -15,7 +15,11 @@ fs::path exe_assets_dir() {
     std::error_code ec;
     const std::string base = platform::exe_dir();
     if (!base.empty()) {
-        for (const char* rel : {"assets/templates", "../assets/templates",
+        for (const char* rel : {
+#if defined(__APPLE__)
+                                "../Resources/assets/templates",
+#endif
+                                "assets/templates", "../assets/templates",
                                 "../../assets/templates"}) {
             const fs::path cand = fs::path(base) / rel;
             if (fs::is_directory(cand, ec)) return cand;

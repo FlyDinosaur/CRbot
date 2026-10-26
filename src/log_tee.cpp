@@ -145,14 +145,14 @@ std::mutex g_sink_mtx;
 LogSink* g_sink = nullptr;  // 受 g_sink_mtx 保护
 
 void emit(const char* data, size_t size) {
-    LogSink* sink = nullptr;
     {
         std::lock_guard<std::mutex> lk(g_sink_mtx);
-        sink = g_sink;
-    }
-    if (sink) {
-        sink->on_log(data, size);
-        return;
+        // Keep the subscription alive throughout delivery. Removing a sink now
+        // waits for its last callback before the owner can destroy it.
+        if (g_sink) {
+            g_sink->on_log(data, size);
+            return;
+        }
     }
     if (g_console_fd < 0) return;
     size_t off = 0;
