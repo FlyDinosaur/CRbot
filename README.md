@@ -367,6 +367,9 @@ btn_mode_1v1.png    模式菜单「经典1对1」 每次全屏重新找（列表
 * **Windows Release**：**不弹控制台**（`NDEBUG` 下跳过 `AllocConsole`），日志只落 `crbot.log`。
   不想要文件日志就删掉 `main.cpp` 里 `start_log_tee("crbot.log")` 那一行。
 * **macOS GUI**：窗口实时显示，同时写 `~/Library/Logs/CRBot/crbot.log`。
+  macOS GUI / 终端版的日志均带本地时间毫秒级前缀，例如
+  `[2026-10-27 14:23:45.123] [DEVICE] emulator-5556 ...`。
+  时间取自日志管道收到该行首段内容的时刻，界面、复制内容与导出文件使用同一时间戳。
 
 截图走 **PNG**（约 80KB）而不是原始帧（3.7MB）：多开时瓶颈是 adb 通道，PNG 快好几倍；
 解码失败会自动退回原始帧。单帧超过 2 秒会打 `slow screenshot` 警告。
